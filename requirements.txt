@@ -1,0 +1,13 @@
+# LangGraph + LangChain stack (prototype; pin versions in your env as needed)
+langgraph>=0.2.0
+langchain-core>=0.3.0
+langchain-openai>=0.2.0
+langchain-community>=0.3.0
+langchain-text-splitters>=0.3.0
+pydantic>=2.0
+python-dotenv>=1.0.0
+typing_extensions>=4.0
+fastapi>=0.110.0
+uvicorn>=0.30.0
+# FAISS backend for langchain_community.vectorstores.FAISS
+faiss-cpu>=1.8.0
