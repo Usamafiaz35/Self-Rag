@@ -56,6 +56,10 @@ def _runtime_from_app(fastapi_app: FastAPI) -> GraphRuntime:
     return runtime
 
 
+@app.get("/")
+def root() -> dict[str, str]:
+    return {"message": "Hello, main api page!"}
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
