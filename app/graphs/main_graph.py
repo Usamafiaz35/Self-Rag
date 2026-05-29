@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from langchain_core.retrievers import BaseRetriever
 from langchain_openai import ChatOpenAI
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 
 from app.config.settings import Settings
@@ -36,6 +37,7 @@ def build_graph(
     settings: Settings,
     llm: ChatOpenAI,
     retriever: BaseRetriever,
+    checkpointer: BaseCheckpointSaver,
 ):
     """
     Build and compile the graph.
@@ -110,4 +112,4 @@ def build_graph(
 
     g.add_edge("rewrite_question", "retrieve")
 
-    return g.compile()
+    return g.compile(checkpointer=checkpointer)
