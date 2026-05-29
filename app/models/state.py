@@ -7,11 +7,17 @@ Pydantic models match the notebook's decision classes for ``with_structured_outp
 
 from __future__ import annotations
 
-from typing import List, Literal
+import operator
+from typing import Annotated, List, Literal
 
 from langchain_core.documents import Document
 from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
+
+
+class ChatMessage(TypedDict):
+    role: Literal["user", "assistant"]
+    content: str
 
 
 class GraphState(TypedDict):
@@ -34,6 +40,9 @@ class GraphState(TypedDict):
 
     isuse: Literal["useful", "not_useful"]
     use_reason: str
+
+    # Persisted per thread_id via PostgresSaver; appended after each successful turn.
+    chat_history: Annotated[list[ChatMessage], operator.add]
 
 
 class RetrieveDecision(BaseModel):

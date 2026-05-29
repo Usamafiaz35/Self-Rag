@@ -11,3 +11,6 @@ fastapi>=0.110.0
 uvicorn>=0.30.0
 # FAISS backend for langchain_community.vectorstores.FAISS
 faiss-cpu>=1.8.0
+# LangGraph Postgres checkpoint persistence
+langgraph-checkpoint-postgres>=2.0.0
+psycopg[binary]>=3.1.0
