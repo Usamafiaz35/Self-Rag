@@ -13,6 +13,11 @@ from langgraph.graph import END, START, StateGraph
 
 from app.config.settings import Settings
 from app.models.state import GraphState
+from app.nodes.conversation import (
+    decide_answer_source,
+    generate_from_history,
+    route_after_answer_source,
+)
 from app.nodes.generate import (
     generate_direct,
     generate_from_context,
@@ -49,6 +54,8 @@ def build_graph(
 
     g = StateGraph(GraphState)
 
+    g.add_node("decide_answer_source", decide_answer_source)
+    g.add_node("generate_from_history", generate_from_history)
     g.add_node("decide_retrieval", decide_retrieval)
     g.add_node("generate_direct", generate_direct)
     g.add_node("retrieve", retrieve)
@@ -64,7 +71,15 @@ def build_graph(
 
     g.add_node("rewrite_question", rewrite_question)
 
-    g.add_edge(START, "decide_retrieval")
+    g.add_edge(START, "decide_answer_source")
+
+    g.add_conditional_edges(
+        "decide_answer_source",
+        route_after_answer_source,
+        {"conversation": "generate_from_history", "documents": "decide_retrieval"},
+    )
+
+    g.add_edge("generate_from_history", END)
 
     g.add_conditional_edges(
         "decide_retrieval",

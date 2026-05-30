@@ -2,7 +2,7 @@
 FastAPI backend for the existing self-RAG graph.
 
 Run with:
-    uvicorn app.api.main:app --reload
+    python -m uvicorn app.api.main:app --reload
 Then open:
     http://127.0.0.1:8000/docs
 """
@@ -13,12 +13,15 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.persistence.checkpointer import list_thread_ids
 from app.runtime import (
     GraphRuntime,
     ask_question,
+    ask_question_stream,
     close_runtime,
     create_runtime,
     get_chat_history,
@@ -44,10 +47,6 @@ class AskResponse(BaseModel):
     use_reason: str | None = None
     rewrite_tries: int = 0
     retries: int = 0
-
-
-class CreateChatResponse(BaseModel):
-    thread_id: str = Field(..., description="Unique id for this chat session.")
 
 
 class ChatMessageOut(BaseModel):
@@ -81,6 +80,18 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://127.0.0.1:5500",
+        "http://localhost:5500",
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+    ],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 def _runtime_from_app(fastapi_app: FastAPI) -> GraphRuntime:
     runtime = getattr(fastapi_app.state, "runtime", None)
@@ -91,20 +102,9 @@ def _runtime_from_app(fastapi_app: FastAPI) -> GraphRuntime:
     return runtime
 
 
-@app.get("/")
-def root() -> dict[str, str]:
-    return {"message": "Hello, main api page!"}
-
-
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
-
-
-@app.post("/chats", response_model=CreateChatResponse)
-def create_chat() -> CreateChatResponse:
-    """Start a new chat session with a unique thread_id."""
-    return CreateChatResponse(thread_id=new_thread_id())
 
 
 @app.get("/chats", response_model=ChatListResponse)
@@ -149,4 +149,28 @@ def ask(payload: AskRequest) -> AskResponse:
         use_reason=result.get("use_reason"),
         rewrite_tries=result.get("rewrite_tries", 0) or 0,
         retries=result.get("retries", 0) or 0,
+    )
+
+
+@app.post("/ask/stream")
+def ask_stream(payload: AskRequest) -> StreamingResponse:
+    """Stream graph progress and answer tokens as Server-Sent Events."""
+    question = payload.question.strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="Question cannot be empty.")
+
+    thread_id = (payload.thread_id or "").strip() or new_thread_id()
+    runtime = _runtime_from_app(app)
+
+    def event_generator():
+        yield from ask_question_stream(runtime, question, thread_id)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )

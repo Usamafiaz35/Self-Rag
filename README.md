@@ -16,6 +16,7 @@ LangGraph **self-RAG** workflow refactored from [`notebooks/original_notebook.ip
 | [`app/deps.py`](app/deps.py) | Shared `llm`, `retriever`, `settings` after `run.py` initializes. |
 | [`app/runtime.py`](app/runtime.py) | Shared bootstrap + invoke helpers used by CLI and FastAPI. |
 | [`app/api/main.py`](app/api/main.py) | FastAPI app exposing backend endpoints over the same graph logic. |
+| [`frontend/`](frontend/) | Standalone ChatGPT-style web UI (vanilla HTML/JS). |
 | [`run.py`](run.py) | Terminal interactive chat loop using the same runtime/invoke path. |
 
 ## Setup
@@ -25,6 +26,7 @@ LangGraph **self-RAG** workflow refactored from [`notebooks/original_notebook.ip
 
    ```bash
    OPENAI_API_KEY=sk-...
+   DATABASE_URL=postgresql://postgres:password@localhost:5432/self-rag
    ```
 
 3. Install dependencies:
@@ -56,8 +58,12 @@ This starts a terminal chat loop. Type questions and press Enter. Type `exit` to
 Start the API server from project root:
 
 ```bash
-uvicorn app.api.main:app --reload
+python scripts/run_api.py
 ```
+
+Or on Windows: double-click `run_api.bat`.
+
+This frees port 8000 if a stale server is still running (fixes `WinError 10013`). Optional `.env` keys: `API_HOST`, `API_PORT`.
 
 Open FastAPI docs:
 
@@ -66,14 +72,18 @@ Open FastAPI docs:
 
 ### Endpoints
 
-- `GET /health` - simple health check.
-- `POST /ask` - ask one question using the existing graph.
+- `GET /health` — health check.
+- `GET /chats` — list chat thread ids.
+- `GET /chats/{thread_id}` — message history for a thread.
+- `POST /ask` — ask one question (full JSON response).
+- `POST /ask/stream` — same input as `/ask`, streams SSE events (`thread_id`, `status`, `token`, `clear`, `done`, `error`).
 
-Example request body for `/ask`:
+Example request body for `/ask` or `/ask/stream`:
 
 ```json
 {
-  "question": "Describe NexaAI's company culture."
+  "question": "Describe NexaAI's company culture.",
+  "thread_id": null
 }
 ```
 
@@ -84,13 +94,21 @@ Response includes:
 - `isuse`, `use_reason`
 - `rewrite_tries`, `retries`
 
+## Web UI (frontend)
+
+A standalone ChatGPT-style UI lives in [`frontend/`](frontend/). See [`frontend/README.md`](frontend/README.md).
+
+1. Start the API: `python scripts/run_api.py` (or `run_api.bat`)
+2. Serve the UI: `cd frontend && python -m http.server 5500`
+3. Open [http://127.0.0.1:5500](http://127.0.0.1:5500)
+
 ### Conditional routing vs the notebook
 
 The notebook’s `add_conditional_edges` `path_map` keys (e.g. `"False"` / `"True"` for retrieval routing) must match what each router function returns. In the saved notebook, several routers returned **different** strings than those keys; the modular code returns strings that match the **existing** `path_map` destinations (no new branches—only aligned return labels). See [`app/nodes/route_question.py`](app/nodes/route_question.py).
 
 ## Future work (out of scope here)
 
-FastAPI, databases, frontend, deployment, and monitoring can be added later without changing the core `app/` graph.
+The graph uses persisted `chat_history` for conversation memory (names, prior questions) and company PDFs for document RAG.
 
 
 ## Created by Usama Fiaz

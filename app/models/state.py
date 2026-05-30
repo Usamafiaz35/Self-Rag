@@ -44,6 +44,19 @@ class GraphState(TypedDict):
     # Persisted per thread_id via PostgresSaver; appended after each successful turn.
     chat_history: Annotated[list[ChatMessage], operator.add]
 
+    # Set by decide_answer_source: conversation-only vs company-doc RAG path.
+    answer_source: str
+
+
+class AnswerSourceDecision(BaseModel):
+    source: Literal["conversation", "documents"] = Field(
+        ...,
+        description=(
+            "conversation: answer only from prior messages in this thread. "
+            "documents: answer from company PDF retrieval (may also use history as context)."
+        ),
+    )
+
 
 class RetrieveDecision(BaseModel):
     should_retrieve: bool = Field(

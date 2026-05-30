@@ -13,7 +13,8 @@ venv/
 env/
 .env
 .venv/
-
+myenv/
+.myenv/
 # Environment Variables (IMPORTANT - API keys yahan hote hain)
 .env
 *.env
@@ -30,3 +31,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Auto-generated when API_PORT != 8000
+frontend/js/config.local.js
