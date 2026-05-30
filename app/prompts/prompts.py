@@ -6,18 +6,60 @@ This file exists so prompt wording can evolve without touching routing or graph 
 
 from langchain_core.prompts import ChatPromptTemplate
 
+answer_source_prompt = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            "Classify how to answer the user's latest message.\n"
+            "Return JSON with key: source (conversation or documents).\n\n"
+            "- conversation: The answer must come from the chat history (e.g. user's name they "
+            "stated earlier, listing prior questions, what was said in this thread).\n"
+            "- documents: The answer needs company PDF facts (policies, pricing, leadership from docs), "
+            "even if history provides helpful context.\n\n"
+            "If the user asks about this chat or themselves from earlier messages, choose conversation.",
+        ),
+        (
+            "human",
+            "Conversation history:\n{chat_history}\n\nLatest question: {question}",
+        ),
+    ]
+)
+
+history_generation_prompt = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            "You answer using ONLY the conversation history below.\n"
+            "Rules:\n"
+            "- Use facts explicitly stated by the user or assistant in this thread.\n"
+            "- If listing questions the user asked, include every user message that was a question.\n"
+            "- Do not invent names or facts not in the history.\n"
+            "- If the history does not contain the answer, say clearly what is missing.\n"
+            "- Do not use company document knowledge; only the chat transcript.",
+        ),
+        (
+            "human",
+            "Conversation history:\n{chat_history}\n\nLatest question: {question}",
+        ),
+    ]
+)
+
 decide_retrieval_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            "You decide whether retrieval is needed.\n"
+            "You decide whether retrieval from company PDFs is needed.\n"
             "Return JSON with key: should_retrieve (boolean).\n\n"
             "Guidelines:\n"
             "- should_retrieve=True if answering requires specific facts from company documents.\n"
-            "- should_retrieve=False for general explanations/definitions.\n"
+            "- should_retrieve=False if the conversation history already has enough to answer, "
+            "or the question is general knowledge.\n"
             "- If unsure, choose True.",
         ),
-        ("human", "Question: {question}"),
+        (
+            "human",
+            "Conversation history:\n{chat_history}\n\nLatest question: {question}",
+        ),
     ]
 )
 
@@ -25,11 +67,15 @@ direct_generation_prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            "Answer using only your general knowledge.\n"
-            "If it requires specific company info, say:\n"
-            "'I don't know based on my general knowledge.'",
+            "Answer the latest question.\n"
+            "Use the conversation history when it contains relevant facts (e.g. the user's name).\n"
+            "Use general knowledge only when needed.\n"
+            "If the question needs specific company facts not in history, say you need company documents.",
         ),
-        ("human", "{question}"),
+        (
+            "human",
+            "Conversation history:\n{chat_history}\n\nLatest question: {question}",
+        ),
     ]
 )
 
@@ -59,11 +105,17 @@ rag_generation_prompt = ChatPromptTemplate.from_messages(
             "system",
             "You are a business rag chatbot.\n\n"
             "You will receive a CONTEXT block from internal company documents.\n"
-            "Task:\n"
-            "Answer the question based on the context"
-            "Dont mention that you are getting a context in your answer",
+            "You may also receive conversation history from this chat thread.\n"
+            "Prefer CONTEXT for company facts; use conversation history for personal details "
+            "the user shared earlier (e.g. their name).\n"
+            "Do not mention that you are using a context block in your answer.",
         ),
-        ("human", "Question:\n{question}\n\nContext:\n{context}"),
+        (
+            "human",
+            "Conversation history:\n{chat_history}\n\n"
+            "Latest question:\n{question}\n\n"
+            "Context:\n{context}",
+        ),
     ]
 )
 
@@ -94,7 +146,8 @@ issup_prompt = ChatPromptTemplate.from_messages(
         ),
         (
             "human",
-            "Question:\n{question}\n\n"
+            "Conversation history:\n{chat_history}\n\n"
+            "Latest question:\n{question}\n\n"
             "Answer:\n{answer}\n\n"
             "Context:\n{context}\n",
         ),
@@ -143,7 +196,8 @@ isuse_prompt = ChatPromptTemplate.from_messages(
         ),
         (
             "human",
-            "Question:\n{question}\n\nAnswer:\n{answer}",
+            "Conversation history:\n{chat_history}\n\n"
+            "Latest question:\n{question}\n\nAnswer:\n{answer}",
         ),
     ]
 )

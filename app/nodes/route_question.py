@@ -11,13 +11,17 @@ from typing import Literal
 from app.deps import get_deps
 from app.models.state import GraphState, RetrieveDecision
 from app.prompts.prompts import decide_retrieval_prompt
+from app.utils.chat_history import history_from_state
 
 
 def decide_retrieval(state: GraphState):
     deps = get_deps()
     should_retrieve_llm = deps.llm.with_structured_output(RetrieveDecision)
     decision: RetrieveDecision = should_retrieve_llm.invoke(
-        decide_retrieval_prompt.format_messages(question=state["question"])
+        decide_retrieval_prompt.format_messages(
+            question=state["question"],
+            chat_history=history_from_state(state),
+        )
     )
     return {"need_retrieval": decision.should_retrieve}
 

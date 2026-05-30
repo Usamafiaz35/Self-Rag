@@ -7,7 +7,7 @@ Same logic as the notebook cells; ``accept_answer`` is kept as in the notebook (
 from __future__ import annotations
 
 from app.chains.rag_chain import invoke_rag_answer, join_context
-from app.deps import get_deps
+from app.deps import emit_stream_clear, get_deps, stream_llm_text
 from app.models.state import (
     GraphState,
     IsSUPDecision,
@@ -21,12 +21,16 @@ from app.prompts.prompts import (
     revise_prompt,
     rewrite_for_retrieval_prompt,
 )
+from app.utils.chat_history import history_from_state
 
 
 def generate_direct(state: GraphState):
     deps = get_deps()
-    out = deps.llm.invoke(direct_generation_prompt.format_messages(question=state["question"]))
-    return {"answer": out.content}
+    messages = direct_generation_prompt.format_messages(
+        question=state["question"],
+        chat_history=history_from_state(state),
+    )
+    return {"answer": stream_llm_text(deps.llm, messages)}
 
 
 def generate_from_context(state: GraphState):
@@ -34,8 +38,13 @@ def generate_from_context(state: GraphState):
     context = join_context(state.get("relevant_docs", []))
     if not context:
         return {"answer": "No answer found.", "context": ""}
-    out = invoke_rag_answer(deps.llm, state["question"], context)
-    return {"answer": out.content, "context": context}
+    answer = invoke_rag_answer(
+        deps.llm,
+        state["question"],
+        context,
+        chat_history=history_from_state(state),
+    )
+    return {"answer": answer, "context": context}
 
 
 def no_answer_found(state: GraphState):
@@ -50,6 +59,7 @@ def is_sup(state: GraphState):
             question=state["question"],
             answer=state.get("answer", ""),
             context=state.get("context", ""),
+            chat_history=history_from_state(state),
         )
     )
     return {"issup": decision.issup, "evidence": decision.evidence}
@@ -61,15 +71,14 @@ def accept_answer(state: GraphState):
 
 def revise_answer(state: GraphState):
     deps = get_deps()
-    out = deps.llm.invoke(
-        revise_prompt.format_messages(
-            question=state["question"],
-            answer=state.get("answer", ""),
-            context=state.get("context", ""),
-        )
+    emit_stream_clear()
+    messages = revise_prompt.format_messages(
+        question=state["question"],
+        answer=state.get("answer", ""),
+        context=state.get("context", ""),
     )
     return {
-        "answer": out.content,
+        "answer": stream_llm_text(deps.llm, messages),
         "retries": state.get("retries", 0) + 1,
     }
 
@@ -81,6 +90,7 @@ def is_use(state: GraphState):
         isuse_prompt.format_messages(
             question=state["question"],
             answer=state.get("answer", ""),
+            chat_history=history_from_state(state),
         )
     )
     return {"isuse": decision.isuse, "use_reason": decision.reason}
